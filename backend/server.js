@@ -54,7 +54,27 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    port: PORT,
+    env: process.env.NODE_ENV
+  });
+});
+
+// Root health check for Railway
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'Weather Dashboard API is running!',
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Additional health endpoint for Railway
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    service: 'weather-dashboard',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -79,23 +99,44 @@ initializeDatabase()
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🌐 Server accessible at http://0.0.0.0:${PORT}`);
+      console.log(`✅ Health check available at http://0.0.0.0:${PORT}/health`);
     });
+
+    // Keep the process alive
+    server.keepAliveTimeout = 65000;
+    server.headersTimeout = 66000;
 
     // Graceful shutdown handling
-    process.on('SIGTERM', () => {
-      console.log('📝 SIGTERM received, shutting down gracefully');
-      server.close(() => {
-        console.log('✅ Server closed');
+    const gracefulShutdown = (signal) => {
+      console.log(`📝 ${signal} received, shutting down gracefully`);
+      server.close((err) => {
+        if (err) {
+          console.error('❌ Error during server close:', err);
+          process.exit(1);
+        }
+        console.log('✅ Server closed successfully');
         process.exit(0);
       });
+      
+      // Force close after timeout
+      setTimeout(() => {
+        console.log('⏰ Forcing server close after timeout');
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    
+    // Handle uncaught exceptions
+    process.on('uncaughtException', (err) => {
+      console.error('💥 Uncaught Exception:', err);
+      gracefulShutdown('uncaughtException');
     });
 
-    process.on('SIGINT', () => {
-      console.log('📝 SIGINT received, shutting down gracefully');
-      server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
-      });
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+      gracefulShutdown('unhandledRejection');
     });
   })
   .catch(err => {
