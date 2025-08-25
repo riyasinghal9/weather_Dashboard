@@ -38,6 +38,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/weather', weatherRoutes);
 app.use('/api/cities', citiesRoutes);
 
+// Serve static files from React build in production
+if (process.env.NODE_ENV === 'production') {
+  const path = require('path');
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  
+  // Handle React Router (return `index.html` for all non-API routes)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
