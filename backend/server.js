@@ -10,7 +10,7 @@ const citiesRoutes = require('./routes/cities');
 const { initializeDatabase } = require('./config/database');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Security middleware
 app.use(helmet());
@@ -75,9 +75,27 @@ app.use('*', (req, res) => {
 // Initialize database and start server
 initializeDatabase()
   .then(() => {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🌐 Server accessible at http://0.0.0.0:${PORT}`);
+    });
+
+    // Graceful shutdown handling
+    process.on('SIGTERM', () => {
+      console.log('📝 SIGTERM received, shutting down gracefully');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', () => {
+      console.log('📝 SIGINT received, shutting down gracefully');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
     });
   })
   .catch(err => {
